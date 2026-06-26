@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Desk</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 { text-align: center; color: #333; margin-bottom: 10px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; margin-bottom: 5px; color: #333; }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #667eea;
+            outline: none;
+        }
+        textarea { min-height: 100px; resize: vertical; }
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: translateY(-2px); }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .trello-link {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e8f5e9;
+            border-radius: 8px;
+            color: #2e7d32;
+            display: none;
+        }
+        .trello-link a { color: #2e7d32; font-weight: bold; }
+        .nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: #f0f0ff;
+            font-weight: 500;
+        }
+        .nav a:hover { background: #667eea; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Help Desk</h1>
+        <p class="subtitle">Sistema de Gestión de Incidencias</p>
+
+        <div class="nav">
+            <a href="/">📝 Crear Ticket</a>
+            <a href="/login.html">🔒 Login</a>
+            <a href="/admin.html">👨‍💼 Panel Admin</a>
+            <a href="/dashboard.html">📊 Dashboard</a>
+        </div>
+
+        <div id="alert" class="alert"></div>
+
+        <form id="ticketForm">
+            <div class="form-group">
+                <label>Título *</label>
+                <input type="text" id="titulo" required placeholder="Ej: Problema con la impresora">
+            </div>
+            <div class="form-group">
+                <label>Descripción *</label>
+                <textarea id="descripcion" required placeholder="Describa el problema en detalle..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>Prioridad</label>
+                <select id="prioridad">
+                    <option value="normal">🟢 Normal</option>
+                    <option value="alta">🟠 Alta</option>
+                    <option value="urgente">🔴 Urgente</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Email *</label>
+                <input type="email" id="email" required placeholder="su@email.com">
+            </div>
+            <button type="submit">🚀 Enviar Ticket</button>
+        </form>
+
+        <div id="trelloInfo" class="trello-link"></div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+
+        document.getElementById('ticketForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const ticket = {
+                titulo: document.getElementById('titulo').value,
+                descripcion: document.getElementById('descripcion').value,
+                prioridad: document.getElementById('prioridad').value,
+                email_usuario: document.getElementById('email').value
+            };
+
+            const submitBtn = e.target.querySelector('button');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = '⏳ Enviando...';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_URL}/tickets`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(ticket)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('✅ Ticket creado exitosamente!', 'success');
+                    document.getElementById('ticketForm').reset();
+
+                    if (result.trello_card_url) {
+                        const trelloDiv = document.getElementById('trelloInfo');
+                        trelloDiv.innerHTML = `
+                            🔴 Ticket URGENTE - Se ha creado una tarjeta en Trello:<br>
+                            <a href="${result.trello_card_url}" target="_blank">Ver en Trello</a>
+                        `;
+                        trelloDiv.style.display = 'block';
+                    } else {
+                        document.getElementById('trelloInfo').style.display = 'none';
+                    }
+
+                    if (result.gemini_clasificacion) {
+                        console.log('🧠 Clasificación IA:', result.gemini_clasificacion);
+                    }
+                } else {
+                    showAlert('❌ Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showAlert('❌ Error de conexión', 'error');
+            } finally {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+
+        function showAlert(message, type) {
+            const alertDiv = document.getElementById('alert');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            alertDiv.style.display = 'block';
+            setTimeout(() => { alertDiv.style.display = 'none'; }, 5000);
+        }
+    </script>
+</body>
+</html>
